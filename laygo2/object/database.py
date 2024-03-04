@@ -1734,7 +1734,7 @@ class Design(BaseDatabase):
         return p
 
     # I/O functions
-    def export_to_template(self, libname=None, cellname=None):
+    def export_to_template(self, libname=None, cellname=None, metal_table:dict=None, net_ignore:list=None):
         """
         Generate a NativeInstanceTemplate object corresponding to Design object.
 
@@ -1791,10 +1791,35 @@ class Design(BaseDatabase):
             libname = self.libname
         if cellname is None:
             cellname = self.cellname
-
         xy = self.bbox
         pins = self.pins
-        return laygo2.object.NativeInstanceTemplate(libname=libname, cellname=cellname, bbox=xy, pins=pins)
+        if net_ignore is None:
+            _net_ignore = []
+        else:
+            _net_ignore = net_ignore
+        # export subblocks
+        sub_blocks = dict()
+        for _instName, _inst in self.instances.items():
+            if "NoName" in _instName: # via or other instances which are not sub-blocks
+                continue
+            sub_blocks[_instName] = _inst
+        if metal_table is not None:
+            # export metals
+            metals = list()
+            for _layer in metal_table.keys():
+                for _metal in self.get_matched_rects_by_layer([_layer,'drawing']):
+                    if _metal.__class__ == laygo2.object.Pin or _metal.netname in _net_ignore:
+                        continue
+                    metals.append(_metal)
+            for pin in self.pins.values():
+                if pin.layer[0] in metal_table.keys() and pin.netname not in _net_ignore:
+                    _layer = pin.layer[0]
+                    _grid = metal_table[_layer]
+                    _xy = _grid.abs2phy(_grid.mn(pin))
+                    metals.append(laygo2.object.Rect(xy=_xy, layer=[_layer,'drawing'], netname = pin.netname))
+        else:
+            metals = None
+        return laygo2.object.NativeInstanceTemplate(libname=libname, cellname=cellname, bbox=xy, pins=pins, sub_blocks=sub_blocks, metals=metals)
 
     def get_matched_rects_by_layer(self, layer):
         """
@@ -1867,6 +1892,8 @@ class Design(BaseDatabase):
                             hextension=inst.hextension,
                             vextension=inst.vextension,
                             color=inst.color,
+                            name=name,
+                            netname=inst.netname
                         )
                         obj_check.append(ninst)  ## ninst is for sort, inst should be frozen for implement to layout
         return obj_check

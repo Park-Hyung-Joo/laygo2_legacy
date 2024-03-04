@@ -163,7 +163,7 @@ class NativeInstanceTemplate(Template):
 
     _pins = None
 
-    def __init__(self, libname, cellname, bbox=np.array([[0, 0], [0, 0]]), pins=None):
+    def __init__(self, libname, cellname, bbox=np.array([[0, 0], [0, 0]]), pins=None, sub_blocks=None, metals=None):
         """
         Constructor function.
 
@@ -211,6 +211,8 @@ class NativeInstanceTemplate(Template):
         self.cellname = cellname
         self._bbox = None if bbox is None else np.asarray(bbox)
         self._pins = pins
+        self.sub_blocks = sub_blocks
+        self.metals = metals
         Template.__init__(self, name=cellname)
 
     def summarize(self):
@@ -459,8 +461,45 @@ class NativeInstanceTemplate(Template):
         db["cellname"] = self.cellname
         db["bbox"] = self.bbox().tolist()
         db["pins"] = dict()
+        pinNames = set(self.pins().keys())
         for pn, p in self.pins().items():
             db["pins"][pn] = p.export_to_dict()
+    # export subblocks
+        if self.sub_blocks is not None:
+            db['sub_blocks'] = dict()
+            for _instName, _inst in self.sub_blocks.items():
+                if "NoName" in _instName: # via or other instances which is not sub-block
+                    continue
+                inst = dict()
+                inst['name'] = _instName
+                inst['cellname'] = _inst.cellname
+                inst['libname'] = _inst.libname
+                inst['xy'] = _inst.xy.tolist()
+                inst['transform'] = _inst.transform
+                inst['pins'] = dict()
+                for _pinName, pin in _inst.pins.items():
+                    inst['pins']['termName'] = _pinName
+                    inst['pins']['netname'] = pin.netname
+                db['sub_blocks'][_instName] = inst
+
+        if self.metals is not None:
+            # export obstacles
+            db['obstacles'] = list()
+            db['ports'] = dict()
+            for _pinname in self.pins().keys():
+                db['ports'][_pinname] = list()
+            for _metal in self.metals:
+                metal = dict()
+                metal['xy'] = _metal.xy.tolist()
+                metal['layer'] = _metal.layer[0]
+                if _metal.netname is not None:
+                    metal['netname'] = _metal.netname
+                    if _metal.netname in pinNames:
+                        db['ports'][_metal.netname].append(metal)
+                    else:
+                        db['obstacles'].append(metal) 
+                else:
+                    db['obstacles'].append(metal)  
         return db
 
 
