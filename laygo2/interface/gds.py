@@ -220,6 +220,7 @@ def export(db, filename, cellname=None, scale = 1e-9, layermapfile="default.laye
 
     # Create library.
     lib = gdspy.GdsLibrary()
+    gdspy.current_library = gdspy.GdsLibrary()
     for cn in cellname:
         # Create cell.
         cell = lib.new_cell(cn)
@@ -230,10 +231,11 @@ def export(db, filename, cellname=None, scale = 1e-9, layermapfile="default.laye
                                  )
             if tobj is not None:
                 cell.add(tobj)
-    lib.write_gds(filename)
+    if filename is not None: 
+        lib.write_gds(filename)
     if svg_filename is not None: 
-        cell.write_svg(svg_filename)
-        if svg_filename is not None: 
+        cell.write_svg(svg_filename, scaling=1)
+        if png_filename is not None: 
             # import cairosvg here to avoid unnecessary lib installation for non-gds options.
             import cairosvg
             cairosvg.svg2png(url=svg_filename, write_to=png_filename, scale=1.0)

@@ -34,6 +34,7 @@ __status__ = "Prototype"
 import yaml
 import os.path
 import laygo2
+import numpy as np
 
 def export_template(template, filename, mode='append'):
     """Export a template to a yaml file.
@@ -84,6 +85,44 @@ def export_template(template, filename, mode='append'):
     libname = template.libname
     cellname = template.cellname
     pins = template.pins()
+    # sub_blocks = template.sub_blocks # sub_blocks[instName] == inst(not template)
+    # obstacles = template.obstacles # obstacles = [Rect0, Rect1, Rect2 ...]
+    db = dict()
+    if mode == 'append':  # in append mode, the template is appended to 'filename' if the file exists.
+        if os.path.exists(filename):
+            with open(filename, 'r') as stream:
+                db = yaml.load(stream, Loader=yaml.FullLoader)
+        else:
+            f_new = open(filename, "w")
+            f_new.write(f"{libname}:\n")
+            f_new.write(f"    dummy:\n")
+            f_new.write(f"        bbox:\n")
+            f_new.write(f"        - - 0\n")
+            f_new.write(f"          - 0\n")
+            f_new.write(f"        - - 0\n")
+            f_new.write(f"          - 0\n")
+            f_new.write(f"        cellname: dummy\n")
+            f_new.write(f"        libname: {libname}\n")
+
+            f_new.close()
+            with open(filename, 'r') as stream:
+                db = yaml.load(stream, Loader=yaml.FullLoader)
+    if db == None:
+        db[libname] = dict()
+    elif libname not in db:
+        db[libname] = dict()
+    db[libname][cellname] = template.export_to_dict()
+    with open(filename, 'w') as stream:
+        yaml.dump(db, stream)
+    #print("Your design was translated into YAML format.")
+    return db
+
+#filename=libname+'_templates.yaml'
+def export_design(design, filename, obs_layers:list=None, mode='append'):
+
+    libname = design.libname
+    cellname = design.cellname
+    pins:dict = design.pins
 
     db = dict()
     if mode == 'append':  # in append mode, the template is appended to 'filename' if the file exists.
@@ -105,16 +144,39 @@ def export_template(template, filename, mode='append'):
             f_new.close()
             with open(filename, 'r') as stream:
                 db = yaml.load(stream, Loader=yaml.FullLoader)
-
     if libname not in db:
         db[libname] = dict()
-    db[libname][cellname] = template.export_to_dict()
+    # export basic information
+    nat_temp = design.export_to_template(libname=libname, cellname=cellname)
+    db[libname][cellname] = nat_temp.export_to_dict()
+    # export subblocks
+    db[libname][cellname]['sub_blocks'] = dict()
+    for _instName, _inst in design.instances.items():
+        if "NoName" in _instName: # via or other instances which is not sub-block
+            continue
+        inst = dict()
+        inst['name'] = _instName
+        inst['cellname'] = _inst.cellname
+        inst['libname'] = _inst.libname
+        inst['xy'] = _inst.xy.tolist()
+        inst['transform'] = _inst.transform
+        db[libname][cellname]['sub_blocks'][_instName] = inst
+    # export obstacles
+    db[libname][cellname]['obstacles'] = list()
+    for _layer in obs_layers:
+        for _metal in design.get_matched_rects_by_layer([_layer,'drawing']):
+            metal = dict()
+        #    print(_metal.xy)
+            metal['xy'] = _metal.xy.tolist()
+            metal['layer'] = _layer
+            if _metal.netname is not None:
+                metal['netname'] = _metal.netname
+            db[libname][cellname]['obstacles'].append(metal)
+
     with open(filename, 'w') as stream:
         yaml.dump(db, stream)
     #print("Your design was translated into YAML format.")
     return db
-
-#filename=libname+'_templates.yaml'
 
 def import_template(filename):
     """Import templates from a yaml file.
@@ -151,7 +213,8 @@ def import_template(filename):
     if os.path.exists(filename):
         with open(filename, 'r') as stream:
             db = yaml.load(stream, Loader=yaml.FullLoader)
-
+    else:
+        print("no such file: "+filename)
     libname = list(db.keys())[0]  # assuming there's only one library defined in each file.
     # create template library
     tlib = laygo2.object.database.TemplateLibrary(name=libname)
