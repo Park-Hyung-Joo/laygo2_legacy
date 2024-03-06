@@ -35,11 +35,11 @@ __maintainer__ = ""
 __status__ = "Prototype"
 
 
-def _py2magic_number(value, scale=1):
+def _py2magic_number(value, scale:float=1.0):
     fmt_str = "%." + "%d" % (-1 * log10(scale) + 1) + "f "  # for truncations
     return fmt_str % (value * scale)
 
-def _py2magic_list(pylist, scale=1):
+def _py2magic_list(pylist, scale:float=1.0):
     """Convert a python list object to a magic(tcl) list."""
     list_str = "{ "
     for item in pylist:
@@ -57,7 +57,7 @@ def _py2magic_list(pylist, scale=1):
     return list_str
 
 
-def _translate_obj(libpath, objname, obj, scale=1, master=None, offset=np.array([0, 0])):
+def _translate_obj(libpath, objname, obj, scale:float=1.0, master=None, offset=np.array([0, 0])):
     """
     Convert an object to corresponding scale commands.
     offset : np.array([int, int])
@@ -154,7 +154,7 @@ def _translate_obj(libpath, objname, obj, scale=1, master=None, offset=np.array(
 
     return ""
 
-def export(db, filename=None, cellname=None, libpath='./magic_layout', scale=1, 
+def export(db, filename=None, cellname=None, libpath='./magic_layout', scale:float=1.0, 
            reset_library=False, tech_library=None, gds_filename=None):
     """
     Export a laygo2.object.database.Library object to magic's tcl code.
